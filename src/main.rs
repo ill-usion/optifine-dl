@@ -1,6 +1,7 @@
 mod constants;
 
 use colored::*;
+use comfy_table::{Cell, Color, ContentArrangement, Table};
 use constants::*;
 use futures_util::StreamExt;
 use indicatif::{ProgressBar, ProgressStyle};
@@ -11,6 +12,7 @@ use std::{
     error::Error,
     io::{stdin, stdout, Write},
     path::PathBuf,
+    vec,
 };
 use tokio::{
     fs::{self, File},
@@ -48,7 +50,7 @@ struct MinecraftVersion {
     downloads: Vec<OptifineVersion>,
 }
 
-const OPTIFINE_SCRAPER_VERSION: &str = "1.0.0";
+const OPTIFINE_SCRAPER_VERSION: &str = "1.1.0";
 
 async fn download_page(url: &str) -> Result<Html, Box<dyn Error>> {
     let resp = reqwest::get(url).await.unwrap();
@@ -59,7 +61,11 @@ async fn download_page(url: &str) -> Result<Html, Box<dyn Error>> {
 }
 
 fn read_version() -> String {
-    print!("Enter a Minecraft version ({}): ", "e.g 1.16.5".cyan());
+    print!(
+        "Enter a Minecraft version ({})\n[{}] To list available versions: ",
+        "e.g 1.16.5".cyan(),
+        "l".yellow()
+    );
     stdout().flush().unwrap();
 
     let mut input = String::new();
@@ -139,6 +145,38 @@ async fn download_of_version(version: &OptifineVersion) -> Result<PathBuf, Box<d
     Ok(path)
 }
 
+fn list_minecraft_versions(mc_versions: &[MinecraftVersion]) {
+    let mut table = Table::new();
+    table
+        .set_content_arrangement(ContentArrangement::Dynamic)
+        .set_header(vec![
+            Cell::new("Minecraft Version").fg(Color::Green),
+            Cell::new("Available Optifine Versions").fg(Color::Green),
+        ]);
+
+    for ver in mc_versions {
+        let of_versions: Vec<String> = ver
+            .downloads
+            .iter()
+            .take(3)
+            .map(|v| v.filename.clone())
+            .collect();
+        let mut of_versions_str = of_versions.join("\n");
+
+        let num_downloads = ver.downloads.len();
+        if num_downloads > 3 {
+            of_versions_str += &format!("\n+{} more", (num_downloads - 3));
+        }
+
+        table.add_row(vec![
+            Cell::new(&ver.version).fg(Color::DarkYellow),
+            Cell::new(of_versions_str),
+        ]);
+    }
+
+    println!("{table}");
+}
+
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
     println!("{}", ASCII_LOGO.red());
@@ -198,8 +236,12 @@ async fn main() -> Result<(), Box<dyn Error>> {
     let mut target_version: Option<&MinecraftVersion> = None;
     'outer: while target_version.is_none() {
         let version_choice = read_version();
-        println!("Searching for version {}...", version_choice);
+        if version_choice.to_lowercase() == "l" {
+            list_minecraft_versions(&mc_versions);
+            continue;
+        }
 
+        println!("Searching for version {}...", version_choice);
         for ver in mc_versions.iter() {
             if ver.version == version_choice {
                 target_version = Some(ver);
@@ -242,7 +284,9 @@ async fn main() -> Result<(), Box<dyn Error>> {
     println!("Proceed with the installation. When you're done press Enter to exit.");
     stdin().read_line(&mut String::new())?;
 
+    println!("Cleaning up...");
     fs::remove_file(jar_file_path).await?;
 
+    println!("Exiting...");
     Ok(())
 }

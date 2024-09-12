@@ -1,6 +1,6 @@
 [package]
 name = "optifine-dl"
-version = "1.0.0"
+version = "1.1.0"
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
@@ -12,3 +12,4 @@ indicatif = "0.17.7"
 reqwest = { version = "0.11", features = ["blocking", "stream"] }
 tokio = { version = "1.35.1", features = ["full"] }
 futures-util = "0.3.30"
+comfy-table = "7.1.1"
